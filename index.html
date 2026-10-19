@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下载与整理台账</title>
+<meta name="description" content="记录每次下载的软件素材与文件整理动作的工作台账，含磁盘占用概览、整理时间线与可勾选待办。">
+<style>
+/* ============================================================
+   设计令牌 · 工业实用方向
+   深色底 + 琥珀橙单一强调色 + 等宽数据字
+   ============================================================ */
+:root{
+  --bg:#0e0d0c; --bg2:#141311; --surface:#1a1917; --surface2:#211f1c;
+  --text:#f2ede4; --muted:#a39c90; --dim:#6f6a61;
+  --accent:#ff6b2c; --accent-dim:rgba(255,107,44,.14);
+  --ok:#4ade80; --warn:#fbbf24; --info:#5e5ce6;
+  --line:rgba(242,237,228,.12); --line2:rgba(242,237,228,.06);
+  --radius:3px; --radius-lg:8px;
+  --s1:4px;--s2:8px;--s3:16px;--s4:24px;--s5:40px;--s6:64px;--s7:96px;
+  --sh1:0 2px 8px rgba(0,0,0,.30);
+  --sh2:0 8px 28px rgba(0,0,0,.38);
+  --sh3:0 24px 64px rgba(0,0,0,.46);
+  --ease:cubic-bezier(.16,1,.3,1);
+  --dur1:160ms; --dur2:320ms; --dur3:640ms;
+  --font-display:"Impact","Haettenschweiler","Arial Black","Source Han Sans SC Heavy","Microsoft YaHei",sans-serif;
+  --font-body:"Source Han Sans SC","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:"JetBrains Mono","IBM Plex Mono","SFMono-Regular",Consolas,Menlo,monospace;
+}
+[data-theme="light"]{
+  --bg:#f4f1eb; --bg2:#eae6de; --surface:#fffdf9; --surface2:#f0ece5;
+  --text:#1c1917; --muted:#6b655c; --dim:#9a948a;
+  --accent:#d94f14; --accent-dim:rgba(217,79,20,.10);
+  --ok:#15803d; --warn:#a16207; --info:#4338ca;
+  --line:rgba(28,25,23,.14); --line2:rgba(28,25,23,.07);
+  --sh1:0 2px 8px rgba(28,25,23,.08);
+  --sh2:0 8px 28px rgba(28,25,23,.10);
+  --sh3:0 24px 64px rgba(28,25,23,.12);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg); color:var(--text);
+  font:15px/1.7 var(--font-body); -webkit-font-smoothing:antialiased;
+  letter-spacing:.01em; min-height:100vh; position:relative; overflow-x:hidden}
+body::before{content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(52rem 34rem at 8% -8%, rgba(255,107,44,.20), transparent 62%),
+    radial-gradient(44rem 30rem at 96% 2%, rgba(94,92,230,.14), transparent 58%),
+    linear-gradient(180deg, transparent 60%, rgba(255,107,44,.05) 100%)}
+body::after{content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.04;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:var(--s6) var(--s4) var(--s7)}
+
+/* ---------- 页头 ---------- */
+header{display:grid; grid-template-columns:1fr auto; gap:var(--s4); align-items:end;
+  padding-bottom:var(--s4); border-bottom:1px solid var(--line); margin-bottom:var(--s5)}
+.eyebrow{font:600 12px/1 var(--font-mono); letter-spacing:.22em; text-transform:uppercase;
+  color:var(--accent); margin-bottom:var(--s3)}
+h1{font:900 clamp(40px,6.4vw,72px)/.98 var(--font-display); letter-spacing:-.02em}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted); margin-top:var(--s2); max-width:54ch; font-size:14px}
+.hd-tools{display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap}
+.btn{background:var(--surface); color:var(--text); border:1px solid var(--line);
+  padding:10px 14px; min-height:44px; border-radius:var(--radius); cursor:pointer;
+  font:600 13px/1 var(--font-body); transition:all var(--dur1) ease-out;
+  display:inline-flex; align-items:center; gap:6px}
+.btn:hover{border-color:var(--accent); color:var(--accent); transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.on{background:var(--accent); border-color:var(--accent); color:#0e0d0c}
+.btn.on:hover{color:#0e0d0c; filter:brightness(1.08)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* ---------- 统计条 ---------- */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:1px; background:var(--line); border:1px solid var(--line);
+  border-radius:var(--radius-lg); overflow:hidden; margin-bottom:var(--s5)}
+.stat{background:var(--surface); padding:var(--s4) var(--s3)}
+.stat b{display:block; font:700 34px/1 var(--font-mono); font-variant-numeric:tabular-nums}
+.stat:nth-child(2) b{color:var(--accent)}
+.stat em{display:block; font-style:normal; font-size:12px; color:var(--muted);
+  margin-top:var(--s2); letter-spacing:.05em}
+
+/* ---------- Tab ---------- */
+nav{display:flex; gap:var(--s1); flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:var(--s5)}
+.tab{background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
+  padding:12px 16px; min-height:44px; cursor:pointer; font:600 14px/1 var(--font-body);
+  transition:color var(--dur1) ease-out,border-color var(--dur1) ease-out; margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--accent); border-bottom-color:var(--accent)}
+.tab i{font:600 11px/1 var(--font-mono); font-style:normal; opacity:.6; margin-left:6px}
+
+.panel{display:none} .panel.on{display:block}
+.reveal{opacity:0; transform:translateY(18px)}
+.reveal.in{opacity:1; transform:none;
+  transition:opacity var(--dur2) var(--ease), transform var(--dur2) var(--ease)}
+.reveal:nth-child(2){transition-delay:70ms} .reveal:nth-child(3){transition-delay:140ms}
+.reveal:nth-child(4){transition-delay:210ms} .reveal:nth-child(5){transition-delay:280ms}
+
+/* ---------- 工具栏 ---------- */
+.tools{display:flex; align-items:center; gap:var(--s2); margin-bottom:var(--s4); flex-wrap:wrap}
+.tools input{flex:1; max-width:320px; background:var(--surface); border:1px solid var(--line);
+  color:var(--text); padding:11px 14px; min-height:44px; border-radius:var(--radius); font:14px var(--font-body)}
+.tools input::placeholder{color:var(--dim)}
+.tools .hint{font:600 12px/1 var(--font-mono); color:var(--dim); letter-spacing:.1em}
+
+/* ---------- 表格 ---------- */
+.tw{border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; background:var(--surface)}
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{background:var(--surface2); text-align:left; padding:12px 14px; font:600 12px/1.4 var(--font-mono);
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+  border-bottom:1px solid var(--line); white-space:nowrap}
+td{padding:12px 14px; border-bottom:1px solid var(--line2); vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background var(--dur1) ease-out}
+tbody tr:hover{background:var(--accent-dim)}
+th:first-child,td:first-child{padding-left:var(--s4)}
+th:last-child,td:last-child{padding-right:var(--s4)}
+.mono{font-family:var(--font-mono); font-size:13px}
+.path{font-family:var(--font-mono); font-size:12.5px; color:var(--accent); word-break:break-all}
+.date{font-family:var(--font-mono); font-size:12.5px; color:var(--muted); white-space:nowrap}
+.nm{font-weight:600}
+.copy{background:none; border:1px solid var(--line); color:var(--dim); width:26px; height:26px;
+  border-radius:2px; cursor:pointer; font-size:12px; line-height:1; margin-left:6px;
+  transition:all var(--dur1) ease-out; vertical-align:middle}
+.copy:hover{border-color:var(--accent); color:var(--accent)}
+.copy.done{background:var(--ok); border-color:var(--ok); color:#0e0d0c}
+
+.badge{display:inline-block; padding:3px 9px; border-radius:999px; font:600 11px/1.5 var(--font-mono);
+  letter-spacing:.06em; white-space:nowrap}
+.b-ok{background:rgba(74,222,128,.14); color:var(--ok)}
+.b-do{background:var(--accent-dim); color:var(--accent)}
+.b-wa{background:rgba(251,191,36,.14); color:var(--warn)}
+
+/* ---------- 磁盘占用条 ---------- */
+.bars{display:flex; flex-direction:column; gap:var(--s3); padding:var(--s4)}
+.bar-row{display:grid; grid-template-columns:150px 1fr 78px; gap:var(--s3); align-items:center}
+.bar-row .lb{font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.track{height:10px; background:var(--surface2); border:1px solid var(--line2);
+  border-radius:999px; overflow:hidden}
+.fill{height:100%; width:0; border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),#ffa06b);
+  transition:width 900ms var(--ease)}
+.fill.alt{background:linear-gradient(90deg,var(--info),#8b88ff)}
+.bar-row .vl{font:600 13px/1 var(--font-mono); text-align:right; font-variant-numeric:tabular-nums}
+.bar-row .tag{font-size:11px; color:var(--dim); font-family:var(--font-mono)}
+
+/* ---------- 时间线 ---------- */
+.tl{position:relative; padding:var(--s4) var(--s4) var(--s4) var(--s6)}
+.tl::before{content:""; position:absolute; left:28px; top:var(--s4); bottom:var(--s4);
+  width:1px; background:var(--line)}
+.tl-item{position:relative; padding-bottom:var(--s4)}
+.tl-item:last-child{padding-bottom:0}
+.tl-item::before{content:""; position:absolute; left:-25px; top:7px; width:9px; height:9px;
+  border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--accent-dim)}
+.tl-item h4{font-size:14px; margin-bottom:3px}
+.tl-item .meta{font:600 11.5px/1 var(--font-mono); color:var(--accent); letter-spacing:.08em; margin-bottom:5px}
+.tl-item p{font-size:13.5px; color:var(--muted)}
+
+/* ---------- 待办 ---------- */
+.todo{display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s3) var(--s4);
+  border-bottom:1px solid var(--line2); cursor:pointer; transition:background var(--dur1) ease-out}
+.todo:last-child{border-bottom:none}
+.todo:hover{background:var(--accent-dim)}
+.todo .box{flex:0 0 22px; width:22px; height:22px; margin-top:2px; border:1.5px solid var(--dim);
+  border-radius:var(--radius); display:grid; place-items:center; transition:all var(--dur1) ease-out}
+.todo.done .box{background:var(--accent); border-color:var(--accent)}
+.todo .box svg{width:13px; height:13px; opacity:0; transition:opacity var(--dur1)}
+.todo.done .box svg{opacity:1}
+.todo .bx{flex:1}
+.todo .tt{font-weight:600; transition:color var(--dur1)}
+.todo.done .tt{color:var(--dim); text-decoration:line-through}
+.todo .ds{font-size:13px; color:var(--muted); margin-top:4px}
+.todo.done .ds{color:var(--dim)}
+.todo mark{background:none; color:var(--accent); font-family:var(--font-mono); font-size:12.5px}
+
+/* ---------- 卡片 ---------- */
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden}
+.card{background:var(--surface); padding:var(--s4); position:relative; overflow:hidden}
+.card::before{content:attr(data-n); position:absolute; right:-8px; top:-14px;
+  font:900 78px/1 var(--font-display); color:var(--accent); opacity:.09; letter-spacing:-.04em}
+.card h3{font-size:15px; margin-bottom:var(--s2); position:relative}
+.card p{font-size:13.5px; color:var(--muted); position:relative}
+.card .file{font-family:var(--font-mono); font-size:12px; color:var(--accent);
+  word-break:break-all; margin-bottom:6px; display:block}
+
+.note{border-left:2px solid var(--accent); background:var(--surface);
+  padding:var(--s3) var(--s4); margin-top:var(--s4); border-radius:0 var(--radius) var(--radius) 0}
+.note h4{font-size:13px; color:var(--accent); margin-bottom:var(--s2);
+  font-family:var(--font-mono); letter-spacing:.1em; text-transform:uppercase}
+.note ul{padding-left:18px} .note li{font-size:13.5px; color:var(--muted); margin:5px 0}
+.note code,.card code{font-family:var(--font-mono); font-size:12.5px; color:var(--text);
+  background:var(--surface2); padding:1px 5px; border-radius:2px}
+.note.plain{border-color:var(--dim)} .note.plain h4{color:var(--dim)}
+
+h2.sec{font:700 13px/1 var(--font-mono); letter-spacing:.18em; text-transform:uppercase;
+  color:var(--dim); margin:var(--s5) 0 var(--s3)}
+.empty{display:none; padding:var(--s5); text-align:center; color:var(--dim); font-size:14px}
+
+/* ---------- 提示气泡 ---------- */
+#toast{position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(20px);
+  background:var(--surface2); border:1px solid var(--accent); color:var(--text);
+  padding:12px 20px; border-radius:var(--radius); font-size:13px; z-index:99;
+  opacity:0; pointer-events:none; transition:all var(--dur2) var(--ease); box-shadow:var(--sh2)}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+footer{margin-top:var(--s7); padding-top:var(--s4); border-top:1px solid var(--line);
+  color:var(--dim); font-size:12.5px; display:flex; justify-content:space-between;
+  gap:var(--s3); flex-wrap:wrap}
+footer .mono{font-size:12px}
+
+@media(max-width:768px){
+  .wrap{padding:var(--s5) var(--s3) var(--s6)}
+  header{grid-template-columns:1fr}
+  th,td{padding:10px 12px; font-size:13px}
+  th:first-child,td:first-child{padding-left:12px}
+  .tw{overflow-x:auto} table{min-width:620px}
+  .stat b{font-size:28px}
+  .bar-row{grid-template-columns:96px 1fr 62px; gap:var(--s2)}
+  .tl{padding-left:var(--s5)} .tl::before{left:16px}
+}
+@media print{
+  body::before,body::after{display:none}
+  body{background:#fff;color:#000}
+  nav,.tools,.hd-tools{display:none}
+  .panel{display:block !important}
+  .fill{width:var(--w) !important}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .reveal{opacity:1;transform:none}
+  .fill{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="reveal">
+  <div>
+    <div class="eyebrow">Download &amp; Tidy Ledger</div>
+    <h1>下载与<span>整理</span>台账</h1>
+    <p class="sub">记录每次下载的软件素材与文件整理动作。用来回答两个问题：
+      这东西从哪来的？上次我整理到哪了？</p>
+  </div>
+  <div class="hd-tools">
+    <button class="btn" id="privBtn" aria-pressed="false" title="隐藏用户名、个人库名等身份信息">🛡 脱敏</button>
+    <button class="btn" id="themeBtn" aria-label="切换深浅色">◐ 主题</button>
+    <button class="btn" id="mdBtn">↓ 导出 MD</button>
+    <button class="btn" id="printBtn">⎙ 打印</button>
+  </div>
+</header>
+
+<div class="stats reveal">
+  <div class="stat"><b id="n1">0</b><em>下载记录</em></div>
+  <div class="stat"><b id="n2">0</b><em>整理记录</em></div>
+  <div class="stat"><b id="n3">0</b><em>未完成待办</em></div>
+  <div class="stat"><b id="n4">11</b><em>根目录可见项</em></div>
+  <div class="stat"><b id="n5">48</b><em>隐藏程序目录</em></div>
+</div>
+
+<nav role="tablist" class="reveal">
+  <button class="tab" role="tab" aria-selected="true"  data-p="p0">概览<i id="c0"></i></button>
+  <button class="tab" role="tab" aria-selected="false" data-p="p1">下载记录<i id="c1"></i></button>
+  <button class="tab" role="tab" aria-selected="false" data-p="p2">整理记录<i id="c2"></i></button>
+  <button class="tab" role="tab" aria-selected="false" data-p="p3">待办清单<i id="c3"></i></button>
+  <button class="tab" role="tab" aria-selected="false" data-p="p4">规矩与索引<i id="c4"></i></button>
+</nav>
+
+<div class="tools reveal">
+  <input id="q" type="search" placeholder="搜索内容、路径、来源…" aria-label="搜索台账">
+  <span class="hint" id="qinfo"></span>
+</div>
+
+<!-- ============ 概览 ============ -->
+<section class="panel on reveal" id="p0" role="tabpanel">
+  <h2 class="sec">磁盘占用 TOP（大文件 ≥ 50 MB 合计 277 GB）</h2>
+  <div class="tw"><div class="bars" id="bars"></div></div>
+
+  <h2 class="sec">整理时间线</h2>
+  <div class="tw"><div class="tl" id="tl"></div></div>
+
+  <div class="note">
+    <h4>一句话看懂这台盘</h4>
+    <ul>
+      <li>空间的大头是 <b>雷电模拟器</b>：开了 5 个实例，每个约 34 GB，合计 172 GB。
+          闲置的在多开器里删掉，比删什么都管用。</li>
+      <li>真正能安全删的是 <b>安装包类</b>：百度网盘下载目录 23.6 GB + 软件安装包 14.5 GB。</li>
+      <li>根目录只留 11 个可见项；48 个已安装程序目录是<b>隐藏</b>的，不是删了。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 下载记录 ============ -->
+<section class="panel reveal" id="p1" role="tabpanel">
+  <div class="tw">
+    <table>
+      <thead><tr><th>日期</th><th>内容</th><th>来源 / 许可</th><th>保存位置</th><th>体积</th><th>状态</th></tr></thead>
+      <tbody id="tb1"></tbody>
+    </table>
+  </div>
+  <div class="note">
+    <h4>下载时的经验</h4>
+    <ul>
+      <li>LibreCAD <b>只读 DXF，打不开 DWG</b>。想出 DWG 得靠 LibreDWG 转换。</li>
+      <li>DWG 转换三个坑：<code>MTEXT</code> 降级成 <code>TEXT</code>；标注炸开并把文字改成左对齐绝对坐标；
+          DXF 存 R2000 且设 <code>$DWGCODEPAGE=ANSI_936</code>，否则中文变成 <code>\U+XXXX</code>。</li>
+      <li>静默安装走 PowerShell <code>Start-Process '/S','/D=D:\路径'</code>，bash 直接跑 exe 会被拒。</li>
+      <li>外部依赖先到 GitHub 查四项：维护活跃度 / star / 许可证 / 有无已知漏洞。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 整理记录 ============ -->
+<section class="panel reveal" id="p2" role="tabpanel">
+  <div class="tw">
+    <table>
+      <thead><tr><th>日期</th><th>范围</th><th>主要动作</th><th>结果</th></tr></thead>
+      <tbody id="tb2"></tbody>
+    </table>
+  </div>
+  <h2 class="sec">当前目录结构</h2>
+  <div class="tw">
+    <table><thead><tr><th>一级目录</th><th>装什么</th></tr></thead><tbody id="tb2b"></tbody></table>
+  </div>
+  <div class="note">
+    <h4>三个刻意不改名的目录</h4>
+    <ul>
+      <li><code>软件</code> —— 有桌面快捷方式直接指向内部 exe，改名会断链。</li>
+      <li><code>软件数据</code> —— 程序正在实时读写的缓存，改名会让软件报错。</li>
+      <li><code>CAD</code> —— C 盘 AppData 的 LibreCAD 配置是 junction 过来的，改名会断开。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 待办 ============ -->
+<section class="panel reveal" id="p3" role="tabpanel">
+  <div class="tw" id="todoList"></div>
+  <div class="note plain">
+    <h4>说明</h4>
+    <ul><li>勾选状态存在本机浏览器（localStorage）。换浏览器或清缓存会重置，
+        想长期留痕就跟我说，我写回 Markdown 台账。</li></ul>
+  </div>
+</section>
+
+<!-- ============ 规矩与索引 ============ -->
+<section class="panel reveal" id="p4" role="tabpanel">
+  <h2 class="sec">整理时的六条硬规矩</h2>
+  <div class="grid" id="rules"></div>
+  <h2 class="sec">常用清单文件</h2>
+  <div class="grid" id="idx"></div>
+  <div class="note">
+    <h4>这台电脑的已知情况</h4>
+    <ul>
+      <li><b>D 盘回收站是坏的</b> —— <code>SHFileOperation</code> 返回成功但文件没进去，或直接被删。
+          删东西一律走「移到备份目录 + 还原清单」。</li>
+      <li><b>桌面快捷方式改不动</b> —— Save / replace / MoveFileEx / cmd move 全部拒绝访问，只能手动重建。</li>
+      <li><b>当前会话不是管理员</b> —— 涉及 <code>takeown</code>、系统目录属性的操作必须手工提权。</li>
+    </ul>
+  </div>
+</section>
+
+<div class="empty" id="empty">没有匹配的记录</div>
+
+<footer>
+  <span>建立于 2026-10-19 · 由 WorkBuddy 维护</span>
+  <span class="mono" id="footPath">台账源文件（本地保存）</span>
+</footer>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   数据（与 台账源文件（本地保存） 保持同步）
+   ============================================================ */
+const DL=[
+ {d:'2026-10-19',n:'LibreCAD 2.2.1.6 win64',s:'GitHub 官方 release / GPLv2',p:'D:\\LibreCAD',z:'84 MB → 321 MB',st:'已完成'},
+ {d:'2026-10-19',n:'LibreDWG 0.14 绿色包',s:'GitHub / GPLv3',p:'D:\\CAD\\03-绿色工具',z:'—',st:'已完成'},
+ {d:'2026-10-19',n:'ezdxf 1.4.5',s:'PyPI / MIT',p:'Python 托管环境 envs\\default',z:'—',st:'已完成'}
+];
+const TL=[
+ {d:'2026-10-19',r:'桌面',a:'归档 16 个真实文件，清理临时文件',o:'桌面 52 → 36 项，释放 4.1 GB'},
+ {d:'2026-10-19',r:'D 盘根目录',a:'第 1 轮：删重复快捷方式，搬安装包 / Mod / 音频',o:'198 → 75 项'},
+ {d:'2026-10-19',r:'D 盘根目录',a:'第 3 轮：110 个文件按内容重命名 + 归类',o:'产出 变更清单.csv'},
+ {d:'2026-10-19',r:'D 盘根目录',a:'第 5 轮：Rainmeter 全家桶搬迁 + 51 个程序目录隐藏',o:'75 → 11 项'},
+ {d:'2026-10-19',r:'D 盘根目录',a:'第 6 轮：7 个绿色 / 数据目录真搬家',o:'约 26 GB，秒级无损'},
+ {d:'2026-10-19',r:'全盘',a:'英文名加中文标注（desktop.ini 显示名）',o:'43 个目录，路径一字未改'},
+ {d:'2026-10-19',r:'全盘',a:'空文件扫描与分类判定',o:'2630 个，2496 个判定不可删'},
+ {d:'2026-10-19',r:'全盘',a:'大文件清单（≥ 50 MB）',o:'268 个，合计 277 GB'},
+ {d:'2026-10-19',r:'D 盘根目录',a:'分类重构：拆孤岛 / 修嵌套 / 压层级 / 加数字前缀',o:'见下方结构'}
+];
+const STRUCT=[
+ ['01-我的文档','证件证书 · 演示文稿 · 图片素材 · 电子书 · 其他文档'],
+ ['02-影音素材','音乐 · 游戏音效 · 视频 · 游戏录像'],
+ ['03-我的脚本','QQ群机器人 · 酒馆连接自检 · 狗头军师系列等自写工具'],
+ ['04-安装包','01-系统与装机 … 07-游戏Mod，共 7 类'],
+ ['软件','绿色免安装软件：Rainmeter / nexus / v2rayN / 图吧工具箱 / HGZY'],
+ ['软件数据','程序缓存，勿删'],
+ ['CAD','01-图纸 · 02-软件安装包 · 03-绿色工具 · 04-快捷方式 · 05-配置'],
+ ['整理报告','各类清单 HTML + 备份区'],
+ ['&lt;个人库&gt;','个人库：文档 / 图片 / 音乐 / 视频']
+];
+const DISK=[
+ ['雷电模拟器 · 5 个实例',172,'每个约 34 GB'],
+ ['DMC5 鬼泣5',34,'Steam 游戏本体'],
+ ['百度网盘下载目录',23.6,'Ae2025 / CAD2018 / PS2019 原包'],
+ ['软件安装包',14.5,'7 类归档'],
+ ['游戏录像',15.2,'三角洲 / LOL'],
+ ['MuMu 模拟器 12',8.5,''],
+ ['Frostpunk 2',6.8,''],
+ ['PCL2 启动器',4.9,'.minecraft 在桌面另存 7.2 GB']
+];
+const TODOS=[
+ {t:'跑一次管理员 bat：把三个系统目录收进 D:\\系统保留目录',
+  d:'D:\\CAD\\右键管理员运行-移动系统目录.bat → 右键 → 以管理员身份运行',p:''},
+ {t:'手动重建桌面的 Nexus 快捷方式',d:'目标路径',p:'D:\\软件\\nexus\\Winstep\\Nexus.exe'},
+ {t:'手动重建桌面的 风灵月影修改器 快捷方式',d:'目标路径',
+  p:'D:\\软件\\游戏工具\\FLiNG修改器\\FLiNGTrainer\\FlingTrainer.exe'},
+ {t:'处理雷电模拟器：5 个实例共 172 GB',
+  d:'在雷电多开器里删掉不用的实例，可省 100 GB 以上。切勿手动删 vmdk',p:''},
+ {t:'删除百度网盘下载目录 23.6 GB',d:'Ae2025、CAD2018、Photoshop2019 的原包，都已解压装完',p:''},
+ {t:'删除软件安装包 14.5 GB',d:'归档好的安装包，装完就不需要了',p:''},
+ {t:'确认 Beauty Box 5.0.9 插件是否保留',d:'33.5 MB，AE / PR 都已不在，属无宿主的孤儿文件',p:''},
+ {t:'核对「跳过进场动画」是否与桌面那份重复',d:'桌面那份 3.7 GB',p:''}
+];
+const RULES=[
+ ['移动和删除是同一道权限','都要对源对象的 DELETE 权。看不到管理员就别硬来，takeown 会改写系统的安全描述符。'],
+ ['批量改属性别用 |= HIDDEN','曾经把个人库和 8 个文件夹一并误隐藏了。只改该改的位。'],
+ ['删东西不走回收站','本机 D 盘回收站失效：返回成功但文件没进去。一律用「移到备份目录 + 还原清单」。'],
+ ['空文件不等于垃圾','__init__.py 删了 Python 包就 import 不了；Minecraft 的 .mca 空着也是有效区块。'],
+ ['桌面 .lnk 改不动','Save / replace / MoveFileEx / cmd move 全部拒绝访问，只能手动重建。'],
+ ['.minecraft 存档不要碰','里面藏着正在玩的世界，任何整理动作都可能毁档。']
+];
+const IDX=[
+ ['D:\\D盘根目录说明-必读.txt','根目录导航，每个文件夹装什么'],
+ ['D:\\整理报告\\大文件清单.html','268 个 ≥50 MB 文件，按建议删 / 待定 / 保留标色'],
+ ['D:\\整理报告\\可重装程序清单.html','45 个程序，标注能否无损迁移'],
+ ['D:\\整理报告\\英文名中文标注对照表.html','英文名 ↔ 中文标注'],
+ ['D:\\整理报告\\归类与重命名记录.html','110 个文件的改名对照'],
+ ['D:\\CAD\\01-图纸\\生成脚本\\','所有整理脚本，可重复执行']
+];
+
+/* ============================================================
+   脱敏：把能定位到具体人的信息换掉，分享前一键开启
+   ============================================================ */
+let PRIV = true;   // 发布版：数据已脱敏，默认开启
+/* 用通用模式匹配，规则本身不写死具体名字，这样分享出去也不泄露 */
+const SECRETS = [
+  [/C:\\Users\\[^\\]+/gi, 'C:\\Users\\<用户名>'],
+  [/DESKTOP-[A-Z0-9]+/gi, '<计算机名>'],
+  [/D:\\bai/g, 'D:\\<个人库>'],
+  [/(^|[^\w])bai([^\w]|$)/g, '$1<个人库>$2'],
+  [/&lt;用户名&gt;/gi, '<用户名>']
+];
+function S(t){
+  if(!PRIV) return t;
+  let s = String(t);
+  for(const [re, rp] of SECRETS) s = s.replace(re, rp);
+  return s;
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const E   = s => esc(S(s));                       // 转义 + 脱敏
+const row = c => '<tr>' + c.map(x => '<td>'+x+'</td>').join('') + '</tr>';
+const badge = s => {
+  const c = s.includes('完成') ? 'b-ok' : (s.includes('待') ? 'b-wa' : 'b-do');
+  return `<span class="badge ${c}">${E(s)}</span>`;
+};
+const copyBtn = p => `<button class="copy" data-cp="${esc(p)}" title="复制路径" aria-label="复制路径">⧉</button>`;
+
+function build(){
+  document.getElementById('tb1').innerHTML = DL.map(r=>row([
+    `<span class="date">${E(r.d)}</span>`,
+    `<span class="nm">${E(r.n)}</span>`,
+    `<span class="mono">${E(r.s)}</span>`,
+    `<span class="path">${E(r.p)}</span>${copyBtn(r.p)}`,
+    `<span class="mono">${E(r.z)}</span>`,
+    badge(r.st)
+  ])).join('');
+
+  document.getElementById('tb2').innerHTML = TL.map(r=>row([
+    `<span class="date">${E(r.d)}</span>`,
+    `<span class="nm">${E(r.r)}</span>`,
+    E(r.a),
+    `<span class="mono">${E(r.o)}</span>`
+  ])).join('');
+
+  document.getElementById('tb2b').innerHTML = STRUCT.map(s=>row([
+    `<span class="path" style="font-size:13px">${E(s[0])}</span>`,
+    `<span style="color:var(--muted)">${E(s[1])}</span>`
+  ])).join('');
+
+  const max = Math.max(...DISK.map(d=>d[1]));
+  document.getElementById('bars').innerHTML = DISK.map((d,i)=>{
+    const pct = (d[1]/max*100).toFixed(1);
+    return `<div class="bar-row">
+      <span class="lb" title="${E(d[0])}">${E(d[0])}</span>
+      <span class="track"><i class="fill${i>4?' alt':''}" data-w="${pct}%"></i></span>
+      <span class="vl">${d[1]} GB${d[2]?`<span class="tag"> ${E(d[2])}</span>`:''}</span>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(()=>document.querySelectorAll('.fill')
+    .forEach((f,i)=>setTimeout(()=>f.style.width=f.dataset.w, 90*i)));
+
+  document.getElementById('tl').innerHTML = TL.slice().reverse().map(r=>
+    `<div class="tl-item"><div class="meta">${E(r.d)} · ${E(r.r)}</div>
+      <h4>${E(r.a)}</h4><p>${E(r.o)}</p></div>`).join('');
+
+  document.getElementById('rules').innerHTML = RULES.map((r,i)=>
+    `<div class="card" data-n="${String(i+1).padStart(2,'0')}">
+      <h3>${E(r[0])}</h3><p>${E(r[1])}</p></div>`).join('');
+
+  document.getElementById('idx').innerHTML = IDX.map(i=>
+    `<div class="card"><span class="file">${E(i[0])}</span><p>${E(i[1])}</p></div>`).join('');
+
+  const saved = JSON.parse(localStorage.getItem('ledger_todo')||'{}');
+  document.getElementById('todoList').innerHTML = TODOS.map((x,i)=>{
+    const on = saved[i] ? ' done' : '';
+    return `<div class="todo${on}" data-i="${i}" role="checkbox" tabindex="0" aria-checked="${!!saved[i]}">
+      <div class="box"><svg viewBox="0 0 16 16" fill="none" stroke="#0e0d0c" stroke-width="2.4">
+        <path d="M3 8.5l3.5 3.5L13 4.5"/></svg></div>
+      <div class="bx"><div class="tt">${E(x.t)}</div>
+        <div class="ds">${E(x.d)}${x.p?' <mark>'+E(x.p)+'</mark>':''}</div></div></div>`;
+  }).join('');
+
+  document.getElementById('n1').textContent = DL.length;
+  document.getElementById('n2').textContent = TL.length;
+  document.getElementById('n3').textContent = TODOS.filter((_,i)=>!saved[i]).length;
+  document.getElementById('c0').textContent = DISK.length+TL.length;
+  document.getElementById('c1').textContent = DL.length;
+  document.getElementById('c2').textContent = TL.length;
+  document.getElementById('c3').textContent = TODOS.filter((_,i)=>!saved[i]).length;
+  document.getElementById('c4').textContent = RULES.length+IDX.length;
+
+  const pb = document.getElementById('privBtn');
+  pb.classList.toggle('on', PRIV);
+  pb.setAttribute('aria-pressed', PRIV);
+  pb.textContent = PRIV ? '🛡 已脱敏' : '🛡 脱敏';
+  document.getElementById('footPath').textContent =
+    PRIV ? '路径已脱敏' : 'D:\\整理报告\\下载与整理台账.md';
+}
+
+/* ---------- 待办勾选 ---------- */
+function toggle(el){
+  const i = el.dataset.i;
+  const s = JSON.parse(localStorage.getItem('ledger_todo')||'{}');
+  s[i] = !s[i];
+  localStorage.setItem('ledger_todo', JSON.stringify(s));
+  el.classList.toggle('done', s[i]);
+  el.setAttribute('aria-checked', s[i]);
+  const left = TODOS.filter((_,k)=>!s[k]).length;
+  document.getElementById('n3').textContent = left;
+  document.getElementById('c3').textContent = left;
+}
+
+/* ---------- 提示气泡 ---------- */
+let toastT;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener('click', e=>{
+  const todo = e.target.closest('.todo');
+  if(todo){ toggle(todo); return; }
+  const cp = e.target.closest('.copy');
+  if(cp){
+    navigator.clipboard?.writeText(cp.dataset.cp)
+      .then(()=>{ cp.classList.add('done'); cp.textContent='✓';
+        toast('已复制：'+cp.dataset.cp);
+        setTimeout(()=>{ cp.classList.remove('done'); cp.textContent='⧉'; }, 1400); })
+      .catch(()=>toast('浏览器不允许复制，请手动选取'));
+    return;
+  }
+  const tab = e.target.closest('.tab');
+  if(tab){
+    document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected', x===tab));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', p.id===tab.dataset.p));
+    document.getElementById('q').value='';
+    document.getElementById('qinfo').textContent='';
+    document.querySelectorAll('tbody tr,.todo').forEach(r=>r.style.display='');
+    document.getElementById('empty').style.display='none';
+    document.querySelectorAll('.fill').forEach(f=>f.style.width=f.dataset.w);
+  }
+});
+document.addEventListener('keydown', e=>{
+  if((e.key===' '||e.key==='Enter') && e.target.classList?.contains('todo')){
+    e.preventDefault(); toggle(e.target);
+  }
+});
+
+/* ---------- 搜索 ---------- */
+const q = document.getElementById('q');
+q.addEventListener('input', ()=>{
+  const v = q.value.trim().toLowerCase(); let hit = 0;
+  document.querySelectorAll('.panel.on tbody tr, .panel.on .todo').forEach(r=>{
+    const ok = !v || r.textContent.toLowerCase().includes(v);
+    r.style.display = ok ? '' : 'none'; if(ok) hit++;
+  });
+  document.getElementById('qinfo').textContent = v ? `命中 ${hit}` : '';
+  document.getElementById('empty').style.display = (v && hit===0) ? 'block' : 'none';
+});
+
+/* ---------- 导出 Markdown ---------- */
+document.getElementById('mdBtn').addEventListener('click', ()=>{
+  const L = [];
+  L.push('# 下载与整理台账', '', `> 导出时间：${new Date().toLocaleString('zh-CN')}`);
+  if(PRIV) L.push('> 已启用脱敏');
+  L.push('', '## 一、下载记录', '', '| 日期 | 内容 | 来源 | 保存位置 | 体积 | 状态 |', '|---|---|---|---|---|---|');
+  DL.forEach(r=>L.push(`| ${S(r.d)} | ${S(r.n)} | ${S(r.s)} | \`${S(r.p)}\` | ${S(r.z)} | ${S(r.st)} |`));
+  L.push('', '## 二、整理记录', '', '| 日期 | 范围 | 动作 | 结果 |', '|---|---|---|---|');
+  TL.forEach(r=>L.push(`| ${S(r.d)} | ${S(r.r)} | ${S(r.a)} | ${S(r.o)} |`));
+  L.push('', '## 三、待办');
+  const sv = JSON.parse(localStorage.getItem('ledger_todo')||'{}');
+  TODOS.forEach((x,i)=>L.push(`- [${sv[i]?'x':' '}] ${S(x.t)}${x.p?`（${S(x.p)}）`:''}`));
+  L.push('', '## 四、六条硬规矩');
+  RULES.forEach((r,i)=>L.push(`${i+1}. **${S(r[0])}** — ${S(r[1])}`));
+  const blob = new Blob([L.join('\n')], {type:'text/markdown;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '下载与整理台账.md';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('已导出 Markdown');
+});
+
+/* ---------- 脱敏 / 主题 / 打印 ---------- */
+document.getElementById('privBtn').addEventListener('click', ()=>{
+  PRIV = !PRIV;
+  localStorage.setItem('ledger_priv', PRIV ? '1' : '0');
+  build();
+  const v = document.getElementById('q').value;
+  if(v) q.dispatchEvent(new Event('input'));
+  toast(PRIV ? '已开启脱敏：用户名与个人库名已隐藏' : '已关闭脱敏，显示完整路径');
+});
+const root = document.documentElement;
+const savedT = localStorage.getItem('ledger_theme');
+if(savedT) root.dataset.theme = savedT;
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('ledger_theme', root.dataset.theme);
+});
+document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+
+/* ---------- 入场 ---------- */
+build();
+requestAnimationFrame(()=>document.querySelectorAll('.reveal').forEach(e=>e.classList.add('in')));
+</script>
+</body>
+</html>
